@@ -1,0 +1,14 @@
+{
+  "proxy_url": "http://127.0.0.1:8080",
+  "country_code": "",
+  "expected_exit_ip": "",
+  "timeout": 600,
+  "mail_timeout": 180,
+  "workers": 4,
+  "ipv4_only": true,
+  "account_proxies": {},
+  "heartbeat": 15,
+  "mailboxes": {
+    "person@example.com": "https://mail.example/otp?email=person@example.com&token=REPLACE_WITH_YOUR_MAIL_TOKEN"
+  }
+}
