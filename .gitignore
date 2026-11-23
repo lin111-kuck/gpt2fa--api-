@@ -25,6 +25,10 @@ cookies*.json
 reports/
 output/
 results/
+batch_results/
+oauth_results/
+*.used
+*.bak
 
 .DS_Store
 Thumbs.db

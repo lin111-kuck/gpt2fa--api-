@@ -25,6 +25,12 @@ def message(code='123456', email=EMAIL, when=None, css_number='999999'):
 
 
 class OAuthTests(unittest.TestCase):
+    def setUp(self):
+        settings = patch.dict('os.environ', {'SUB2API_BASE_URL': 'https://sub2api.example.com',
+                                             'SUB2API_EMAIL': 'admin@example.com'})
+        settings.start()
+        self.addCleanup(settings.stop)
+
     def test_original_four_fields_are_preserved_without_repr_secrets(self):
         text = EMAIL + '----secret-password----' + SECRET + '----https://api.wdmail.top/m?f=html&e=' + EMAIL + ':mail-secret'
         account = o.load_accounts(text)[0]

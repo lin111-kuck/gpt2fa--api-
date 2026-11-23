@@ -8,6 +8,7 @@
 - [Linux 批处理与固定出口说明](SERVER_BATCH_ZH.md)
 - [原代码审查说明](README_REVIEW_ZH.md)
 - [源码 SHA-256 清单](LOCAL_LOGIN_MANIFEST.json)
+- [2026-11-23 上游更新评估与邮箱接口适配](UPSTREAM_REVIEW_20261123.md)
 
 `README_REVIEW_ZH.md` 保留了较早审查快照的历史说明，其中提到的部分辅助文件不在本源码包内。当前使用方式以 `LOCAL_LOGIN_ZH.md` 为准。
 
@@ -22,6 +23,8 @@ bash install_local_login.sh
 ```
 
 Linux 依赖见 `requirements-local.txt`。旧版浏览器流程的额外依赖见 `requirements.txt`。Windows 图形界面可通过 `start_gui.cmd` 启动。
+
+后台地址由 `--base-url` 或 `SUB2API_BASE_URL` 明确配置；管理员邮箱使用 `--email` 或 `SUB2API_EMAIL`。GUI 从相同环境变量读取初始值，未设置时留空，不预填个人站点。
 
 实际运行所需的账号、后台凭据、代理和邮箱配置由使用者单独提供；`relogin.example.json` 仅提供配置格式。
 

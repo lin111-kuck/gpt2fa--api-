@@ -762,8 +762,9 @@ def interactive_options(args, input_fn=None):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--file', type=Path, help='UTF-8: email----password----2FA_SECRET[----mail_url], or email----mail_url')
-    parser.add_argument('--base-url', default='https://www.caeakrma.top')
-    parser.add_argument('--email', default=os.getenv('SUB2API_EMAIL', 'admin@sub2api.local'))
+    parser.add_argument('--base-url', default=os.getenv('SUB2API_BASE_URL', ''),
+                        help='Your HTTPS backend origin; defaults to SUB2API_BASE_URL')
+    parser.add_argument('--email', default=os.getenv('SUB2API_EMAIL', ''))
     group_options = parser.add_mutually_exclusive_group()
     group_options.add_argument('--groups', nargs='+', default=DEFAULT_GROUPS, help='Group names; use --group-ids to select by ID instead')
     group_options.add_argument('--group-ids', nargs='+', help='Active OpenAI group IDs, separated by spaces or commas; replaces default groups')
@@ -798,7 +799,7 @@ def parse_args(argv=None):
         parser.error('--login-only and --dry-run cannot be combined')
     url = urlsplit(args.base_url)
     if url.scheme != 'https' or not url.netloc or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:
-        parser.error('--base-url must be an HTTPS origin')
+        parser.error('Set --base-url or SUB2API_BASE_URL to your HTTPS backend origin')
     if args.max_per_ip < 1 or any(not math.isfinite(n) or n <= 0 for n in
                                 (args.max_latency, args.timeout, args.job_timeout, args.poll_interval, args.mail_timeout)):
         parser.error('Limits and timeouts must be positive finite numbers')

@@ -34,8 +34,8 @@ class ImportApp:
         self.total = 0
         self.connection_inputs = []
         self.task_inputs = []
-        self.url = tk.StringVar(value='https://www.caeakrma.top')
-        self.email = tk.StringVar(value='admin@sub2api.local')
+        self.url = tk.StringVar(value=os.getenv('SUB2API_BASE_URL', ''))
+        self.email = tk.StringVar(value=os.getenv('SUB2API_EMAIL', ''))
         self.password = tk.StringVar()
         self.show_password = tk.BooleanVar(value=False)
         self.direct = tk.BooleanVar(value=True)

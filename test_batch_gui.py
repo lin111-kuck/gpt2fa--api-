@@ -123,6 +123,10 @@ class ServiceTests(unittest.TestCase):
 
 class DesktopTests(unittest.TestCase):
     def setUp(self):
+        settings = patch.dict('os.environ', {'SUB2API_BASE_URL': 'https://sub2api.example.com',
+                                             'SUB2API_EMAIL': 'admin@example.com'})
+        settings.start()
+        self.addCleanup(settings.stop)
         import tkinter as tk
         import batch_login_gui
         try:

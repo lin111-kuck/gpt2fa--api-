@@ -39,7 +39,7 @@ def authenticate(base_url, email, password, direct=True):
     url = urlsplit(origin)
     if (url.scheme != 'https' or not url.netloc or url.username or url.password
             or url.path or url.query or url.fragment):
-        raise batch.ApiError('后台地址必须是 HTTPS 域名，例如 https://www.caeakrma.top')
+        raise batch.ApiError('后台地址必须是 HTTPS 域名，例如 https://sub2api.example.com')
     if not email.strip() or not password:
         raise batch.ApiError('请填写管理员邮箱和密码。')
     client = batch.SafeClient(origin, email.strip(), password, None, 30, direct=direct)

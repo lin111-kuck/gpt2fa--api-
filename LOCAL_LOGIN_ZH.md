@@ -1,6 +1,6 @@
 # 本地协议登录与邮箱 API 取码
 
-2026-11-17。本次改动位于 `E:\Sub2API_login_review_20261116`。
+首次源码快照为 2026-11-17；邮箱接口与配置更新见 [2026-11-23 上游评估](UPSTREAM_REVIEW_20261123.md)。
 
 ## 使用
 
@@ -23,12 +23,16 @@ person@example.com----https://mail.example/otp?email=person@example.com&token=TO
 
 原来的三字段 `邮箱----密码----TOTP密钥` 仍然支持；如果上游追加邮箱二验，会提示补充邮箱 API。这里的密钥是 Base32 长期密钥，不是六位动态码。URL 中的 `e=email:mail_password` 也支持，会校验邮箱与账号是否一致。
 
-本地协议需要 Python 3.11+、Node.js、wreq 0.13.0、requests 2.32.5 和 tzdata。本机虚拟环境已安装 Python 依赖并可找到 Node.js。换 Windows 电脑后运行 `install_local_login.cmd`，并安装 Node.js。GUI 优先使用本目录 `.venv`。旧浏览器脚本需要单独安装 requirements 中的 Playwright；它仍是原来的浏览器实现。
+本地协议需要 Python 3.11+、Node.js、wreq 0.13.0、requests 2.32.5 和 tzdata。Windows 上运行 `install_local_login.cmd`，并安装 Node.js；运行环境以安装脚本的实际检查结果为准。GUI 优先使用本目录 `.venv`。旧浏览器脚本需要单独安装 requirements 中的 Playwright；它仍是原来的浏览器实现。
+
+后台地址与管理员邮箱须由使用者填写。GUI 和两个命令行入口使用相同的 `SUB2API_BASE_URL`、`SUB2API_EMAIL` 环境变量；命令行可用 `--base-url`、`--email` 覆盖。未配置后台地址时，命令行在读取账号或密码前退出并提示配置。
 
 命令行示例：
 
 ```powershell
-Set-Location E:\Sub2API_login_review_20261116
+Set-Location 'C:\path\to\gpt2fa-api'
+$env:SUB2API_BASE_URL = 'https://sub2api.example.com'
+$env:SUB2API_EMAIL = 'admin@example.com'
 .\.venv\Scripts\python.exe -B batch_login.py --file .\my-accounts.txt --group-ids 6 15 --login-engine local --login-only
 ```
 
@@ -47,6 +51,10 @@ Set-Location E:\Sub2API_login_review_20261116
 ```
 
 还支持 WDMail 的“发件人 / 邮箱 / 时间 / 正文”HTML，包括 iframe srcdoc，忽略 script/style 中的数字。结构不同的 API 需要补充解析适配，当前不会猜测任意 JSON 数字为验证码。
+
+补充支持 `verificationCode` / `verify_code` 验证码字段，以及 `receivedAt` / `ts` / `time` 时间戳字段；秒和毫秒时间戳均可。字段名不区分大小写；冲突的验证码或字段不会被任意选用。
+
+HTTP 200 的 JSON 也会区分状态：`{"success":false,"code":"no_code","retryable":true}` 表示继续等待；`code` 为 `null`、空字符串或 `not_found` 等占位值时同样等待，响应正文和嵌套数据里的旧码均不会被提交。`invalid_token`、`unauthorized`、`mailbox_expired` 等明确错误，或不可重试失败，立即返回通用的邮箱配置错误；错误不回显服务端正文、取码 URL 或 token。读取响应期间收到停止信号或检测到预算过期时，会丢弃本次响应。
 
 登录前读取一次邮箱快照；仅接收快照之外的新邮件，并校验可用的收件人和时间。没有时间戳的纯验证码接口要求返回码相对于快照发生变化。带时区时间按其偏移解析；未标时区的日期不猜测时区，依靠快照和新码变化排除旧码。支持解码 WDMail 页面中 Cloudflare 的 `data-cfemail` 邮箱保护格式，解码后仍严格核对收件人，不执行页面脚本。多个同时间候选码会继续等待，避免错投。单次邮箱等待 60 秒后最多请求一次重发；仅在明确收到验证码错误时允许再取一个新码，429、403、网络不确定错误不重放认证 POST。邮箱 API 连接失败会直接报告，初始快照失败时不会继续提交账号密码。
 

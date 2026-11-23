@@ -16,6 +16,60 @@ class MailboxError(Exception):
     pass
 
 
+CODE_FIELDS = ('code', 'otp', 'verification_code', 'verificationcode', 'verify_code')
+TIME_FIELDS = ('received_at', 'receivedat', 'created_at', 'timestamp', 'date', 'ts', 'time')
+PENDING_MARKERS = frozenset(('no_code', 'nocode', 'no_otp', 'none', 'null', 'pending',
+                             'waiting', 'not_ready', 'not_found', 'notfound', 'empty'))
+ERROR_MARKERS = frozenset(('unauthorized', 'forbidden', 'invalid_token', 'token_expired',
+                           'expired_token', 'invalid_api_key', 'mailbox_not_found', 'mailbox_expired'))
+
+
+def normalized_fields(value):
+    fields = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            continue
+        key = key.casefold()
+        if key in fields and fields[key] != item:
+            return None
+        fields[key] = item
+    return fields
+
+
+def reply_state(value, depth=0):
+    """Separate an explicit pending reply from a failed mailbox API response.
+
+    Never use a provider's error message in diagnostics: it can contain the
+    mailbox URL, API credential, recipient or a previous verification code.
+    """
+    if not isinstance(value, dict) or depth > 8:
+        return 'ready'
+    fields = normalized_fields(value)
+    if fields is None:
+        return 'error'
+    error = fields.get('error')
+    statuses = [fields.get(key) for key in ('code', 'status', 'error_code')]
+    if isinstance(error, dict):
+        statuses.extend(error.get(key) for key in ('code', 'type'))
+    elif isinstance(error, str):
+        statuses.append(error)
+    markers = {item.strip().casefold().replace('-', '_').replace(' ', '_')
+               for item in statuses if isinstance(item, str)}
+    if markers & ERROR_MARKERS:
+        return 'error'
+    empty_code = ('code' in fields and (fields['code'] is None or
+                  isinstance(fields['code'], str) and not fields['code'].strip()))
+    if markers & PENDING_MARKERS or empty_code:
+        return 'error' if fields.get('retryable') is False else 'pending'
+    if fields.get('success') is False or fields.get('ok') is False or error:
+        return 'pending' if fields.get('retryable') is True else 'error'
+    for key in ('data', 'result'):
+        state = reply_state(fields.get(key), depth + 1)
+        if state != 'ready':
+            return state
+    return 'ready'
+
+
 def validate_url(url, email=''):
     try:
         p = urlsplit(url)
@@ -136,10 +190,11 @@ def parse_messages(source, email):
                 for code in extract_codes(obj):
                     result.append(Message(code))
             return
-        if obj.get('success') is False or obj.get('ok') is False or obj.get('error'):
+        obj = normalized_fields(obj)
+        if obj is None or reply_state(obj) != 'ready':
             return
         meta = dict(inherited or {})
-        for key in ('to', 'recipient', 'email', 'address', 'received_at', 'created_at', 'timestamp', 'date'):
+        for key in ('to', 'recipient', 'email', 'address', *TIME_FIELDS):
             if obj.get(key) is not None:
                 meta[key] = obj[key]
         recipients = [str(meta[k]) for k in ('to', 'recipient', 'email', 'address') if meta.get(k)]
@@ -149,10 +204,10 @@ def parse_messages(source, email):
         sender = str(obj.get('from') or obj.get('sender') or '')
         if sender and not re.search(r'(?:@|\.)openai\.com\b|\bOpenAI\b|\bChatGPT\b', sender, re.I):
             return
-        received = next((t for k in ('received_at', 'created_at', 'timestamp', 'date')
+        received = next((t for k in TIME_FIELDS
                          if (t := timestamp(meta.get(k))) is not None), None)
         codes = set()
-        for key in ('code', 'otp', 'verification_code'):
+        for key in CODE_FIELDS:
             v = obj.get(key)
             if isinstance(v, (str, int)) and re.fullmatch(r'\d{6}', str(v)):
                 codes.add(str(v))
@@ -212,13 +267,20 @@ class MailboxAPI:
         deadline = time.monotonic() + timeout
         for attempt in range(3):
             try:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise MailboxError('邮箱 API 读取超时')
                 # A read-only GET may recover from a dropped connection within its original budget.
-                with self.session.get(self.url, timeout=max(.1, deadline-time.monotonic()),
+                with self.session.get(self.url, timeout=remaining,
                                       allow_redirects=False, stream=True) as response:
                     if response.status_code != 200:
                         raise MailboxError(f'邮箱 API 返回 HTTP {response.status_code}')
                     body = bytearray()
                     for chunk in response.iter_content(16384):
+                        if self.stop.is_set():
+                            raise MailboxError('任务已停止')
+                        if time.monotonic() >= deadline:
+                            raise MailboxError('邮箱 API 读取超时')
                         body.extend(chunk)
                         if len(body) > 2 * 1024 * 1024:
                             raise MailboxError('邮箱 API 响应超过 2 MiB')
@@ -232,7 +294,15 @@ class MailboxAPI:
                 self.stop.wait(min(.5*(attempt+1), remaining))
                 if self.stop.is_set():
                     raise MailboxError('任务已停止') from None
-        return parse_messages(body.decode('utf-8-sig', errors='replace'), self.email)
+        payload = body.decode('utf-8-sig', errors='replace')
+        state = 'ready'
+        try:
+            state = reply_state(json.loads(payload))
+        except ValueError:
+            pass
+        if state == 'error':
+            raise MailboxError('邮箱 API 返回失败状态；请检查授权和邮箱配置')
+        return parse_messages(payload, self.email)
 
     def snapshot(self, timeout=12):
         self.baseline.update(m.key for m in self.read(timeout))

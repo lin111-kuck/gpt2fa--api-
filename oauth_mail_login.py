@@ -783,8 +783,9 @@ def release_unbound_failure(picker, email):
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--file', type=Path, default=ROOT / 'batch_results/unsuccessful_accounts_20261115.txt')
-    p.add_argument('--base-url', default='https://www.caeakrma.top')
-    p.add_argument('--email', default=os.getenv('SUB2API_EMAIL', 'admin@sub2api.local'))
+    p.add_argument('--base-url', default=os.getenv('SUB2API_BASE_URL', ''),
+                   help='Your HTTPS backend origin; defaults to SUB2API_BASE_URL')
+    p.add_argument('--email', default=os.getenv('SUB2API_EMAIL', ''))
     p.add_argument('--group-ids', nargs='+', default=['6,15,23'])
     p.add_argument('--limit', type=int, default=1, help='Default 1; use 0 for the whole file')
     p.add_argument('--import', dest='do_import', action='store_true', help='Also import after obtaining OAuth credentials')
@@ -805,7 +806,7 @@ def parse_args(argv=None):
     args = p.parse_args(argv)
     u = urlsplit(args.base_url)
     if u.scheme != 'https' or not u.hostname or u.username or u.password or u.path not in ('', '/') or u.query or u.fragment:
-        p.error('--base-url must be an HTTPS origin')
+        p.error('Set --base-url or SUB2API_BASE_URL to your HTTPS backend origin')
     if args.limit < 0 or not 1 <= args.max_per_ip <= 5 or not math.isfinite(args.max_latency) or args.max_latency <= 0 or args.browser_timeout <= 0 or args.verification_wait <= 0:
         p.error('Invalid limits; max-per-ip must be 1..5')
     try:

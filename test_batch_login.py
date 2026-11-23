@@ -37,6 +37,12 @@ def options(**updates):
 
 
 class BatchLoginTests(unittest.TestCase):
+    def setUp(self):
+        settings = patch.dict('os.environ', {'SUB2API_BASE_URL': 'https://sub2api.example.com',
+                                             'SUB2API_EMAIL': 'admin@example.com'})
+        settings.start()
+        self.addCleanup(settings.stop)
+
     def test_input_and_secret_repr(self):
         entries=b.parse_entries(f'A@example.com----pass----{SECRET}\nb@example.com----pass2----{SECRET}')
         self.assertEqual([e.email for e in entries], ['a@example.com','b@example.com'])
