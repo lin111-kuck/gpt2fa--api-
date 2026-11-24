@@ -7,11 +7,19 @@
 | 时间 | 提交 | 内容 |
 | --- | --- | --- |
 | 2026-11-18 22:43 | [f222371](https://github.com/wangshen233/sentinel-rs/commit/f222371c7960be490baf4ab1a2873da900506f2a) | 清理个人路径、真实邮箱端点和供应商示例；本地 WebUI 配置移出版本控制；补充运行产物的忽略规则。 |
-| 2026-11-18 22:02 | [3a8f3b2](https://github.com/wangshen233/sentinel-rs/commit/3a8f3b229648b2c32ef5c01311232cb5ce0c9aaa) | 设备与传输配置调整、静态邮箱清单、JSON 取码与 `no_code` 待机语义，以及本地 WebUI。 |
+| 2026-11-18 22:02 | [3a8f3b2](https://github.com/wangshen233/sentinel-rs/commit/3a8f3b229648b2c32ef5c01311232cb5ce0c9aaa) | 大幅更新设备画像、TLS/HTTP2 档位与请求头同源约束；增加静态邮箱池、代理轮换、运行期出口探测、JSON `no_code` 待机语义和 WebUI。 |
+| 2026-11-18 21:35 | [2c1b60f](https://github.com/wangshen233/sentinel-rs/commit/2c1b60f) | 增加设备指纹生成器基础实现。 |
 
-查询时没有比 11 月 18 日更新的提交。此次评估关注 `src/flow/email.rs`、`src/flow/otp.rs` 的邮箱接口约定，以及最新提交的配置清理。
+查询时没有比 11 月 18 日更新的提交。上次记录只覆盖了邮箱接口，因此遗漏了 `3a8f3b2` 中的指纹、传输和协议链路变更。本次补充核对了 `src/fingerprint.rs`、`src/flow/http.rs`、`src/flow/auth.rs`、`src/flow/mod.rs`、`src/flow/otp.rs` 和 `src/token.rs`。
 
-上游是 Rust 项目，使用 Cargo 的 `wreq=0.16.1`、`wreq-util=0.2.0`；本项目是 Python 服务，依赖 Python `wreq==0.13.0` 和原有 Node 适配器。它们不是同一个包的可直接替换版本。此提交没有引入 Rust VM，也没有修改 Sentinel token 生成、TLS 模拟或设备指纹实现。
+### 指纹与协议更新的实际内容
+
+- 指纹由多个浏览器版本档位、Windows 屏幕、DPR、硬件并发数、设备内存、国家/时区/语言画像组合生成，并要求 UA、低熵 Client Hints、token profile 与 TLS/HTTP2 档位同源。
+- 上游把 Chrome 140/145/146/149 作为成套档位；目标项目当前的 `Chrome152` UA/Client Hints 与 `Chrome152` wreq 选择仍是另一套实现，且目标环境的 wreq 版本约束并不等于上游 Rust 的 wreq-util。
+- 上游增加了代理文件轮换和运行期出口国家探测；目标项目已经有显式代理、出口 IP/国家/时区校验与 IPv4 bridge，但接口、生命周期和错误码不同。
+- 上游注册流程中的跳过冗余 token 交换、邮箱池和 WebUI，不属于目标项目当前的本地登录/导入契约，直接复制会改变登录状态机和凭证边界。
+
+上游是 Rust 项目，使用 Cargo 的 `wreq=0.16.1`、`wreq-util=0.2.0`；本项目是 Python 服务，依赖 Python `wreq==0.13.0`、Node Sentinel 适配器和既有 Sub2API 导入流程。Rust 模块不能作为 Python 文件直接替换。涉及自动化注册、浏览器指纹伪装或规避第三方风控的改动未直接移植；目标仓库保留其现有的画像一致性校验、显式代理约束和协议错误处理。
 
 ## 实际修改
 
