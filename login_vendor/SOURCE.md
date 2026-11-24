@@ -19,7 +19,7 @@ redirects, and removed proxy credentials from the session debug message.
 
 The new login state machine calls `WreqSession` directly with retries disabled.
 It does not call `install()`, `_turb_bridge.py`, registration flows or Turb's
-database, account pool and mail-provider adapters. Chrome152 is selected in wreq;
+database, account pool and mail-provider adapters. sentinel-rs-compatible Chrome140/145/146/149 profiles are selected in wreq;
 the fingerprint UA and Client Hints use the same version. The optional custom
 TLS/HTTP2 variations produced by the original generator are not used here.
 
@@ -28,7 +28,7 @@ directory for each login. It is not included in this source directory. The
 retained SDK adaptation is version-dependent and may require future maintenance.
 
 Additional transport change on 2026-11-17: optional explicit emulation platform.
-The local login engine selects Windows together with Chrome152 on every host,
+The local login engine selects Windows together with one matching Chrome140/145/146/149 profile on every host,
 matching the generated UA/Client Hints rather than using wreq's default platform.
 Native header buffers are decoded from memoryview as well as bytes/bytearray;
 this is required for real Location responses on the Linux wreq build.

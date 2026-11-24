@@ -131,8 +131,10 @@ def detect_exit(session, expected_exit_ip='', country_code='', timeout=15, stop_
 def make_session(proxy, country_code='', *, expected_exit_ip='', timeout=15, stop_event=None, ipv4_only=False):
     from login_vendor.fingerprint import generate_fingerprint
     from login_vendor.http_client_wreq import WreqSession, wreq
-    if wreq is None or not hasattr(wreq.Emulation, 'Chrome152'):
-        raise ProtocolError('本地协议引擎需要 wreq==0.13.0（Chrome152）')
+    # sentinel-rs 3a8f3b2 要求 TLS/HTTP2 档位与 UA/Client Hints major 同档。
+    # 运行时从生成的 fingerprint 选择同名 wreq 档位，禁止固定版本混配。
+    if wreq is None:
+        raise ProtocolError('本地协议引擎需要 wreq==0.13.0')
     try:
         p = urlsplit(proxy)
         if (p.scheme not in ('http', 'https', 'socks5', 'socks5h') or not p.hostname or not p.port
@@ -150,7 +152,15 @@ def make_session(proxy, country_code='', *, expected_exit_ip='', timeout=15, sto
         bridge.__enter__()
         proxy = 'http://127.0.0.1:' + str(bridge.profile['port'])
     try:
-        session = WreqSession(proxy=proxy, impersonate='Chrome152', platform='Windows', retries=0)
+        # 先生成候选画像，再用同档 ChromeN 创建传输会话。
+        # 出口检测仍在会话上执行；画像本身只在检测通过后绑定到该会话。
+        fp = generate_fingerprint(country_code=country_code or 'US', browser_family='chrome')
+        wreq_profile = str(fp.get('impersonate') or '').replace('chrome', 'Chrome', 1)
+        if not re.fullmatch(r'Chrome(?:140|145|146|149)', wreq_profile):
+            raise ProtocolError('指纹与 wreq Chrome 档位不兼容', 'fingerprint_profile_invalid')
+        if not hasattr(wreq.Emulation, wreq_profile):
+            raise ProtocolError(f'wreq 缺少所需 {wreq_profile} 档位', 'wreq_profile_missing')
+        session = WreqSession(proxy=proxy, impersonate=wreq_profile, platform='Windows', retries=0)
     except BaseException:
         if bridge:
             bridge.__exit__()
@@ -169,11 +179,13 @@ def make_session(proxy, country_code='', *, expected_exit_ip='', timeout=15, sto
         session.close = close
     try:
         location = detect_exit(session, expected_exit_ip, country_code, timeout, stop_event)
+        # Rebuild the language/timezone profile from the observed country, then retain
+        # the same Chrome档位 selected for the already-created transport session.
+        from login_vendor.fingerprint import fingerprint_for_impersonate
         fp = generate_fingerprint(country_code=location['country_code'], browser_family='chrome')
-        # Use the detected city timezone rather than the vendor's weighted country default.
+        fp = fingerprint_for_impersonate(str(session._impersonate).lower(), fp)
         fp.update(location)
-        # Match UA/Client Hints with wreq's actual preset; do not mix custom TLS variants.
-        fp.update(impersonate='chrome152', fallback_impersonates=[], tls_fp=None, akamai_fp=None)
+        fp.update(fallback_impersonates=[], tls_fp=None, akamai_fp=None)
         session.headers.update({'accept-language': fp['lang_full'], 'user-agent': fp['user_agent']})
         for key in ('sec_ch_ua', 'sec_ch_ua_platform', 'sec_ch_ua_mobile'):
             if fp.get(key):
@@ -188,7 +200,7 @@ def network_details(fingerprint, phase):
     """Only non-credential fields are exposed to the workbench or relogin progress."""
     return dict(phase=phase, exit_ip=fingerprint['exit_ip'], country_code=fingerprint['country_code'],
                 timezone=fingerprint['timezone'], language=fingerprint['lang_full'],
-                user_agent=fingerprint['user_agent'], browser='Chrome152')
+                user_agent=fingerprint['user_agent'], browser=fingerprint.get('impersonate', 'chrome'))
 
 
 class LoginFlow:

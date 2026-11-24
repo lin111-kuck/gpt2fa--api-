@@ -81,7 +81,7 @@ except Exception:  # pragma: no cover
 
 
 # ── 配置（全部可用环境变量覆盖）──────────────────────────────────────────
-_DEFAULT_EMULATION = (os.environ.get("TURB_WREQ_EMULATION", "") or "Chrome152").strip()
+_DEFAULT_EMULATION = (os.environ.get("TURB_WREQ_EMULATION", "") or "Chrome149").strip()
 _REDIRECT_LIMIT = int(os.environ.get("TURB_WREQ_MAX_REDIRECTS", "30") or 30)
 _RETRIES = int(os.environ.get("TURB_WREQ_RETRIES", "2") or 2)
 _BACKOFF = float(os.environ.get("TURB_WREQ_BACKOFF", "1.5") or 1.5)
@@ -759,7 +759,7 @@ class WreqSession:
 
 
 # ── 工厂 + 打补丁 ────────────────────────────────────────────────────────
-def create_http_session(proxy: Optional[str] = None, impersonate: str = "chrome152",
+def create_http_session(proxy: Optional[str] = None, impersonate: str = "chrome149",
                         user_agent: Optional[str] = None, tls_fp: Optional[dict] = None,
                         akamai_fp: Optional[str] = None, **_kw):
     """与 http_client.create_http_session 同签名。

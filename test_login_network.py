@@ -44,7 +44,9 @@ class NetworkTests(unittest.TestCase):
                 with patch('login_vendor.http_client_wreq.WreqSession', return_value=session) as transport:
                     actual, fp = protocol.make_session(PROXY)
                 self.assertIs(actual, session)
-                transport.assert_called_once_with(proxy=PROXY, impersonate='Chrome152',
+                profile = transport.call_args.kwargs['impersonate']
+                self.assertIn(profile, {'Chrome140', 'Chrome145', 'Chrome146', 'Chrome149'})
+                transport.assert_called_once_with(proxy=PROXY, impersonate=profile,
                                                   platform='Windows', retries=0)
                 self.assertEqual(fp['country_code'], country)
                 self.assertEqual(fp['timezone'], tz)
@@ -52,8 +54,9 @@ class NetworkTests(unittest.TestCase):
                 self.assertEqual(fp['exit_ip'], '8.8.8.8')
                 self.assertEqual(session.headers['accept-language'], fp['lang_full'])
                 self.assertEqual(session.headers['user-agent'], fp['user_agent'])
-                self.assertIn('Chrome/152.', fp['user_agent'])
-                self.assertIn('v="152"', session.headers['sec-ch-ua'])
+                major = fp['user_agent'].split('Chrome/', 1)[1].split('.', 1)[0]
+                self.assertEqual(profile, 'Chrome' + major)
+                self.assertIn(f'v="{major}"', session.headers['sec-ch-ua'])
                 self.assertIsNone(fp['tls_fp'])
                 self.assertIsNone(fp['akamai_fp'])
                 self.assertFalse(session.calls[0][2]['allow_redirects'])

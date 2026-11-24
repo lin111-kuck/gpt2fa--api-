@@ -448,10 +448,12 @@ class ProtocolTests(unittest.TestCase):
                 exit_ip='8.8.8.8', country_code='US', timezone='America/Los_Angeles')):
             session, fp = protocol.make_session('http://127.0.0.1:9', 'US')
         try:
-            self.assertEqual(fp['impersonate'], 'chrome152')
+            self.assertIn(fp['impersonate'], {'chrome140', 'chrome145', 'chrome146', 'chrome149'})
+            major = fp['user_agent'].split('Chrome/', 1)[1].split('.', 1)[0]
+            self.assertEqual(fp['impersonate'], 'chrome' + major)
             self.assertIn('Chrome/152.', session.headers['user-agent'])
             self.assertIn('v="152"', session.headers['sec-ch-ua'])
-            self.assertEqual(session._impersonate, 'Chrome152')
+            self.assertIn(session._impersonate, {'Chrome140', 'Chrome145', 'Chrome146', 'Chrome149'})
             self.assertEqual(session._platform, 'Windows')
             self.assertEqual(session._retries, 0)
             self.assertIsNone(fp['tls_fp'])

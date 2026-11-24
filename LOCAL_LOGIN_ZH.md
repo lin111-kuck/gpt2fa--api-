@@ -107,9 +107,9 @@ $reloginRng.Dispose()
 
 支持从认证响应 JSON 保留本次会话信息，页面跳转后仍可读取工作区，不依赖旧版完整会话 cookie。必要时先加载授权页刷新工作区；仅有唯一候选或唯一个人工作区时自动选择，多个可选工作区则停止并提示人工选择。
 
-OpenAI 和 Sentinel 请求复用一个 wreq Chrome152 会话及同一代理。每次登录生成一套固定的 UA、Client Hints、语言、时区、屏幕、硬件、device ID，Sentinel JS 使用这套画像。此实现没有运行真实浏览器；设置画像并不能证明服务端会接受它，也不能保证避开安全验证。Turb 自定义 JA3/HTTP2 变体未用于当前传输。
+OpenAI 和 Sentinel 请求复用同一 wreq 会话及同一代理。每次登录从 sentinel-rs 对齐的 Chrome140/145/146/149 档位中选择一档；该档位同时决定 UA major、低熵 Client Hints 和 TLS/HTTP2 emulation，禁止出现 UA 版本与握手档位不一致。每次登录还固定语言、时区、屏幕、硬件和 device ID，Sentinel JS 使用同一套画像。此实现没有运行真实浏览器；设置画像并不能证明服务端会接受它，也不能保证避开安全验证。Turb 自定义 JA3/HTTP2 变体未用于当前传输。
 
-登录前通过同一 wreq 会话请求 `https://ipwho.is/`，取得公网出口 IP、国家和 IANA 时区：国家用于选择语言，时区采用检测站返回的具体时区，不再从国家池随机选择。UA、Client Hints、TLS/HTTP2 都使用 Chrome152；wreq 平台明确指定 Windows，与画像的 Windows UA、平台和硬件配套，运行在 Linux 上也保持此画像。未覆盖的国家、检测失败、缺少或无效时区均停止登录，不静默套用美国/UTC，也不切换直连。
+登录前通过同一 wreq 会话请求 `https://ipwho.is/`，取得公网出口 IP、国家和 IANA 时区：国家用于选择语言，时区采用检测站返回的具体时区，不再从国家池随机选择。UA、Client Hints、TLS/HTTP2 始终来自同一 Chrome 档位；wreq 平台明确指定 Windows，与画像的 Windows UA、平台和硬件配套，运行在 Linux 上也保持此画像。未覆盖的国家、检测失败、缺少或无效时区均停止登录，不静默套用美国/UTC，也不切换直连。
 
 登录后再次通过同一会话检测，IP、国家、时区必须与登录前一致，之后才返回凭证。检测请求不含账号密码、验证码、代理凭据或 OAuth token。检测站看到的是对它发请求的出口；按域名分流或每请求轮换的代理仍可能让 OpenAI 看到另一 IP。应使用固定出口代理，让 OpenAI、Sentinel 和检测站走同一路由；前后检测不能证明每条中间请求的 IP 都相同。
 

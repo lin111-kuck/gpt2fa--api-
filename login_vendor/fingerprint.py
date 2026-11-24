@@ -119,34 +119,18 @@ _IPHONE_SCREENS = [
 # 读不出 "146"，所以用最接近的 chrome146/chrome145 顶替是安全的。
 # curl_cffi 一旦放出 chrome152，把下面的 impersonate 换成 chrome152 即可，
 # 其余字段（UA / sec-ch-ua / full-version-list）不受影响。
-_CHROME_TLS_FALLBACK_NOTE = "curl_cffi 0.16.0 最高 chrome146（无 chrome152）"
-
-# ⚠️ 声称的 Chrome 版本 = **真机版本 152**，不要降到 curl_cffi 的 TLS 版本去"对齐"。
-#
-# 2026-09-22 实测教训：曾经把这里改成 146（想消掉「UA 说 152、TLS 是 chrome146」
-# 的矛盾），结果**注册出来的号全部拿不到 Plus 试用**（check_coupon 返回
-# not_eligible），而 Roxy 真机（Chrome 152）注册的号返回 eligible。
-# 同一个出口 IP、同一个请求路径，唯一差别就是注册时声称的版本。
-#   Roxy 真机    Chrome/152.0.0.0   -> check_coupon eligible   VN:0元
-#   协议机 152   Chrome/152.0.0.0   -> 曾拿到 VN:0元（见 exports/revive/README.md）
-#   协议机 146   Chrome/146.0.0.0   -> not_eligible            VN:no
-# 结论：落后 6 个大版本的 Chrome 本身就是可疑信号，比 TLS/UA 版本不齐更致命。
-# Roxy 的 coreVersion 是 152，所以 152 才是"看起来像真机"的值。
+# sentinel-rs 的协议约束：TLS/HTTP2 档位、UA major 和 Client Hints major 必须来自同一档。
+# 这里采用上游 3a8f3b2 的四档模型，禁止 Chrome152 UA 搭配 Chrome145/146 TLS。
+_CHROME_TLS_FALLBACK_NOTE = "sentinel-rs compatible Chrome140/145/146/149 profiles"
 _CHROME_VERSIONS = [
-    {
-        "impersonate": "chrome146",
-        "ver": "152",                  # sec-ch-ua 用：只有 major
-        "ua_ver": "152.0.0.0",         # UA 用：major.0.0.0 缩减形式
-        "full_ver": "152.0.7977.83",   # full-version-list 用：真实构建号
-        "platform_version": "15.0.0",  # Win11（对齐 Roxy WINDOWS_PROFILES 真值）
-    },
-    {
-        "impersonate": "chrome145",
-        "ver": "152",
-        "ua_ver": "152.0.0.0",
-        "full_ver": "152.0.7977.65",
-        "platform_version": "15.0.0",
-    },
+    {"impersonate": "chrome140", "ver": "140", "ua_ver": "140.0.0.0",
+     "full_ver": "140.0.7339.207", "platform_version": "15.0.0", "weight": 10},
+    {"impersonate": "chrome145", "ver": "145", "ua_ver": "145.0.0.0",
+     "full_ver": "145.0.7632.160", "platform_version": "15.0.0", "weight": 35},
+    {"impersonate": "chrome146", "ver": "146", "ua_ver": "146.0.0.0",
+     "full_ver": "146.0.7680.178", "platform_version": "15.0.0", "weight": 35},
+    {"impersonate": "chrome149", "ver": "149", "ua_ver": "149.0.0.0",
+     "full_ver": "149.0.7778.180", "platform_version": "15.0.0", "weight": 20},
 ]
 
 # greasy brand 的真值。真机实测（68/68 requestHeaders 同值）：
@@ -839,7 +823,11 @@ def _gen_ios_safari(r: random.Random) -> dict:
 
 
 def _gen_chrome(r: random.Random) -> dict:
-    chrome = r.choice(_CHROME_VERSIONS)
+    chrome = r.choices(
+        _CHROME_VERSIONS,
+        weights=[float(item.get("weight", 1)) for item in _CHROME_VERSIONS],
+        k=1,
+    )[0]
     others = [c["impersonate"] for c in _CHROME_VERSIONS if c["impersonate"] != chrome["impersonate"]]
     # 低熵：Chromium / Not?A_Brand / Google Chrome（greasy 在第二位）
     sec_ch_ua = _format_brand_list(chrome, full=False)
